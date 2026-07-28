@@ -1,0 +1,16 @@
+{
+  "name": "scrape-propiedades",
+  "version": "1.0.0",
+  "description": "Scraper de propiedades en venta de ZonaProp y ArgenProp",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "scrape": "node index.js",
+    "scrape:zonaprop": "node index.js --zonaprop",
+    "scrape:argenprop": "node index.js --argenprop"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0",
+    "mongodb": "^6.12.0"
+  }
+}

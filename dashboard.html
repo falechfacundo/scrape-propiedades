@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Campos en Venta - Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            surface: { 0: '#0f0f0f', 1: '#1a1a2e', 2: '#16213e', 3: '#1f3460' },
+            accent: { DEFAULT: '#e94560', light: '#ff6b81' },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    * { font-family: 'Inter', sans-serif; }
+    body { background: #0a0a0a; }
+    .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.06); }
+    .card-hover { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 60px rgba(233,69,96,0.1); border-color: rgba(233,69,96,0.3); }
+    .gradient-text { background: linear-gradient(135deg, #e94560, #ff6b81); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .source-badge-zp { background: linear-gradient(135deg, #f97316, #fb923c); }
+    .source-badge-ap { background: linear-gradient(135deg, #3b82f6, #60a5fa); }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+    .stat-glow { box-shadow: 0 0 40px rgba(233,69,96,0.08); }
+    .img-placeholder { background: linear-gradient(135deg, #1a1a2e, #16213e); }
+    @keyframes fadeUp { from { opacity:0; transform: translateY(20px); } to { opacity:1; transform: translateY(0); } }
+    .animate-card { animation: fadeUp 0.4s ease-out forwards; opacity: 0; }
+    .filter-active { background: rgba(233,69,96,0.15); border-color: rgba(233,69,96,0.5); color: #ff6b81; }
+    .leaflet-container { background: #0a0a0a !important; }
+    .leaflet-popup-content-wrapper { background: rgba(15,15,25,0.95) !important; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px !important; color: #fff !important; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+    .leaflet-popup-tip { background: rgba(15,15,25,0.95) !important; }
+    .leaflet-popup-close-button { color: rgba(255,255,255,0.4) !important; }
+    .leaflet-popup-close-button:hover { color: #fff !important; }
+    .leaflet-control-zoom a { background: rgba(15,15,25,0.9) !important; color: rgba(255,255,255,0.6) !important; border-color: rgba(255,255,255,0.08) !important; }
+    .leaflet-control-zoom a:hover { color: #fff !important; }
+    .marker-icon-zp { background: linear-gradient(135deg, #f97316, #fb923c); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; }
+    .marker-icon-ap { background: linear-gradient(135deg, #3b82f6, #60a5fa); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; }
+    .map-toggle { transition: all 0.3s ease; }
+    .map-toggle.active { background: rgba(233,69,96,0.15); border-color: rgba(233,69,96,0.5); color: #ff6b81; }
+  </style>
+</head>
+<body class="min-h-screen text-white scrollbar-thin">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-50 glass border-b border-white/5">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-accent-light flex items-center justify-center text-lg font-bold">C</div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight">Campos en Venta</h1>
+          <p class="text-xs text-white/40">ZonaProp & ArgenProp</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="lastUpdate" class="text-xs text-white/30"></span>
+        <button onclick="location.reload()" class="px-3 py-1.5 rounded-lg glass text-xs text-white/60 hover:text-white transition-colors">
+          <svg class="w-3.5 h-3.5 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Actualizar
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div class="glass rounded-2xl p-5 stat-glow">
+        <p class="text-xs text-white/40 uppercase tracking-wider mb-1">Total Propiedades</p>
+        <p id="statTotal" class="text-3xl font-bold gradient-text">-</p>
+      </div>
+      <div class="glass rounded-2xl p-5">
+        <p class="text-xs text-white/40 uppercase tracking-wider mb-1">ZonaProp</p>
+        <p id="statZP" class="text-3xl font-bold text-orange-400">-</p>
+      </div>
+      <div class="glass rounded-2xl p-5">
+        <p class="text-xs text-white/40 uppercase tracking-wider mb-1">ArgenProp</p>
+        <p id="statAP" class="text-3xl font-bold text-blue-400">-</p>
+      </div>
+      <div class="glass rounded-2xl p-5">
+        <p class="text-xs text-white/40 uppercase tracking-wider mb-1">Precio Min</p>
+        <p id="statMinPrice" class="text-3xl font-bold text-emerald-400">-</p>
+      </div>
+    </div>
+
+    <!-- Resumen por Ubicación -->
+    <div class="glass rounded-2xl p-5 mb-8">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold text-white/70 uppercase tracking-wider">Resumen por Ubicación</h2>
+        <button onclick="toggleLocationTable()" id="locToggle" class="text-[10px] text-white/30 hover:text-white/60 transition-colors">Mostrar tabla</button>
+      </div>
+      <div id="locationSummary" class="hidden"></div>
+      <div id="locationTable" class="hidden overflow-x-auto scrollbar-thin">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="border-b border-white/5">
+              <th class="text-left py-2 px-3 text-white/40 font-medium">Provincia</th>
+              <th class="text-left py-2 px-3 text-white/40 font-medium">Localidad</th>
+              <th class="text-center py-2 px-3 text-white/40 font-medium">ZonaProp</th>
+              <th class="text-center py-2 px-3 text-white/40 font-medium">ArgenProp</th>
+              <th class="text-center py-2 px-3 text-white/40 font-medium">Total</th>
+            </tr>
+          </thead>
+          <tbody id="locationBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="glass rounded-2xl p-4 mb-8 flex flex-wrap items-center gap-3">
+      <span class="text-xs text-white/40 uppercase tracking-wider mr-2">Filtrar:</span>
+      <button data-filter="all" class="filter-btn filter-active px-4 py-1.5 rounded-full text-xs font-medium border border-white/10 transition-all">Todos</button>
+      <button data-filter="zonaprop" class="filter-btn px-4 py-1.5 rounded-full text-xs font-medium border border-white/10 hover:border-orange-400/50 transition-all">ZonaProp</button>
+      <button data-filter="argenprop" class="filter-btn px-4 py-1.5 rounded-full text-xs font-medium border border-white/10 hover:border-blue-400/50 transition-all">ArgenProp</button>
+      <div class="w-px h-5 bg-white/10 mx-1"></div>
+      <button data-size="all" class="size-btn filter-active px-4 py-1.5 rounded-full text-xs font-medium border border-white/10 transition-all">Todo tamaño</button>
+      <button data-size="small" class="size-btn px-4 py-1.5 rounded-full text-xs font-medium border border-white/10 hover:border-white/30 transition-all">&lt; 100 ha</button>
+      <button data-size="medium" class="size-btn px-4 py-1.5 rounded-full text-xs font-medium border border-white/10 hover:border-white/30 transition-all">100 - 1.000 ha</button>
+      <button data-size="large" class="size-btn px-4 py-1.5 rounded-full text-xs font-medium border border-white/10 hover:border-white/30 transition-all">&gt; 1.000 ha</button>
+      <div class="w-px h-5 bg-white/10 mx-1"></div>
+      <select id="sortSelect" class="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/70 outline-none focus:border-accent/50">
+        <option value="price-asc">Precio: menor a mayor</option>
+        <option value="price-desc">Precio: mayor a menor</option>
+        <option value="size-asc">Superficie: menor a mayor</option>
+        <option value="size-desc">Superficie: mayor a menor</option>
+      </select>
+    </div>
+
+    <!-- Map Toggle + Map -->
+    <div class="mb-6">
+      <button id="mapToggle" onclick="toggleMap()" class="map-toggle px-4 py-2 rounded-xl glass text-xs font-medium border border-white/10 text-white/60 hover:text-white transition-all">
+        <svg class="w-4 h-4 inline mr-1.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+        Mostrar Mapa
+      </button>
+    </div>
+    <div id="mapContainer" class="hidden mb-8 glass rounded-2xl overflow-hidden">
+      <div id="map" class="w-full h-[500px]"></div>
+    </div>
+
+    <!-- Grid -->
+    <div id="grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+
+    <!-- Empty state -->
+    <div id="emptyState" class="hidden text-center py-20">
+      <p class="text-white/30 text-lg">No se encontraron propiedades</p>
+    </div>
+  </main>
+
+  <!-- Detail Modal -->
+  <div id="modal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeModal()"></div>
+    <div class="absolute inset-4 md:inset-10 lg:inset-20 glass rounded-3xl overflow-hidden flex flex-col">
+      <div class="flex items-center justify-between p-5 border-b border-white/5">
+        <h2 id="modalTitle" class="text-lg font-semibold truncate pr-4"></h2>
+        <button onclick="closeModal()" class="w-8 h-8 rounded-lg glass flex items-center justify-center text-white/50 hover:text-white transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="flex-1 overflow-auto p-5 scrollbar-thin">
+        <div id="modalContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allProps = [];
+    let activeSource = 'all';
+    let activeSize = 'all';
+    let map = null;
+    let markers = [];
+    let mapInitialized = false;
+
+    function formatPrice(p) {
+      if (!p || p === 'Consultar precio') return '<span class="text-white/40">Consultar</span>';
+      return p;
+    }
+
+    function formatM2(m2) {
+      if (!m2) return '-';
+      if (m2 >= 10000) return (m2 / 10000).toLocaleString('es-AR') + ' ha';
+      return m2.toLocaleString('es-AR') + ' m²';
+    }
+
+    function getSizeHa(m2) {
+      return m2 ? m2 / 10000 : 0;
+    }
+
+    function parsePriceUSD(priceStr) {
+      if (!priceStr || priceStr === 'Consultar precio') return null;
+      const nums = priceStr.replace(/[^0-9]/g, '');
+      return parseInt(nums) || null;
+    }
+
+    function getPlaceholderImg() {
+      return 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="260" fill="%231a1a2e"><rect width="400" height="260"/><text x="200" y="130" font-family="sans-serif" font-size="14" fill="%23ffffff30" text-anchor="middle">Sin imagen</text></svg>');
+    }
+
+    function renderCard(p, i) {
+      const ha = getSizeHa(p.superficieM2);
+      const sizeLabel = ha >= 1 ? ha.toLocaleString('es-AR') + ' ha' : formatM2(p.superficieM2);
+      const badge = p.source === 'zonaprop'
+        ? '<span class="source-badge-zp px-2 py-0.5 rounded-md text-[10px] font-bold text-white uppercase tracking-wider">ZonaProp</span>'
+        : '<span class="source-badge-ap px-2 py-0.5 rounded-md text-[10px] font-bold text-white uppercase tracking-wider">ArgenProp</span>';
+      const type = p.type ? `<span class="px-2 py-0.5 rounded-md bg-white/5 text-[10px] text-white/50">${p.type}</span>` : '';
+      const desc = (p.description || p.features || '').substring(0, 120);
+
+      return `
+        <div class="glass rounded-2xl overflow-hidden card-hover cursor-pointer animate-card" style="animation-delay:${i * 60}ms" onclick='openModal(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
+          <div class="relative h-48 img-placeholder overflow-hidden">
+            <img src="${p.image || getPlaceholderImg()}" alt="" class="w-full h-full object-cover opacity-80 hover:opacity-100 transition-opacity" onerror="this.src='${getPlaceholderImg()}'" loading="lazy">
+            <div class="absolute top-3 left-3 flex gap-1.5">${badge}${type}</div>
+            <div class="absolute bottom-3 right-3 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-sm text-xs font-semibold">${sizeLabel}</div>
+          </div>
+          <div class="p-4">
+            <div class="flex items-start justify-between gap-2 mb-2">
+              <p class="text-sm font-semibold text-white/90 line-clamp-1">${p.title || 'Propiedad'}</p>
+            </div>
+            <p class="text-lg font-bold gradient-text mb-2">${formatPrice(p.price)}</p>
+            <p class="text-xs text-white/40 mb-3 flex items-center gap-1">
+              <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              ${p.location || 'Sin ubicación'}
+            </p>
+            <p class="text-xs text-white/30 line-clamp-2">${desc}...</p>
+          </div>
+        </div>`;
+    }
+
+    function render() {
+      let filtered = allProps.filter(p => {
+        if (activeSource !== 'all' && p.source !== activeSource) return false;
+        const ha = getSizeHa(p.superficieM2);
+        if (activeSize === 'small' && ha >= 100) return false;
+        if (activeSize === 'medium' && (ha < 100 || ha > 1000)) return false;
+        if (activeSize === 'large' && ha <= 1000) return false;
+        return true;
+      });
+
+      const sort = document.getElementById('sortSelect').value;
+      filtered.sort((a, b) => {
+        const pa = parsePriceUSD(a.price) || 0;
+        const pb = parsePriceUSD(b.price) || 0;
+        const sa = a.superficieM2 || 0;
+        const sb = b.superficieM2 || 0;
+        switch (sort) {
+          case 'price-asc': return pa - pb;
+          case 'price-desc': return pb - pa;
+          case 'size-asc': return sa - sb;
+          case 'size-desc': return sb - sa;
+        }
+      });
+
+      const grid = document.getElementById('grid');
+      const empty = document.getElementById('emptyState');
+
+      if (!filtered.length) {
+        grid.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      grid.innerHTML = filtered.map((p, i) => renderCard(p, i)).join('');
+
+      // Stats
+      document.getElementById('statTotal').textContent = filtered.length;
+      document.getElementById('statZP').textContent = filtered.filter(p => p.source === 'zonaprop').length;
+      document.getElementById('statAP').textContent = filtered.filter(p => p.source === 'argenprop').length;
+      const prices = filtered.map(p => parsePriceUSD(p.price)).filter(Boolean);
+      document.getElementById('statMinPrice').textContent = prices.length ? 'USD ' + Math.min(...prices).toLocaleString('es-AR') : '-';
+
+      if (mapInitialized) updateMapMarkers();
+      renderLocationSummary();
+    }
+
+    // --- LOCATION SUMMARY ---
+    function extractProvince(p) {
+      const text = [p.location, p.title, p.description, p.features].filter(Boolean).join(' ');
+      const map = {
+        'Córdoba': ['córdoba', 'valle de punilla', 'villa carlos paz', 'mayu sumaj'],
+        'Neuquén': ['neuquén', 'neuquen', 'futa leufu'],
+        'Buenos Aires': ['buenos aires', 'zárate', 'zarate', 'el rancho', 'pilar', 'luján', 'mercedes'],
+        'Maldonado': ['josé ignacio', 'jose ignacio', 'punta ballena', 'maldonado'],
+        'Formosa': ['formosa', 'pirané', 'pirane', 'la paz', 'cruz del yugo'],
+        'Mendoza': ['mendoza', 'lavalle', 'alto del olvido'],
+        'Entre Ríos': ['entre ríos', 'gualeguaychú', 'gualeguaychu', 'gualeguay'],
+      };
+      for (const [prov, keywords] of Object.entries(map)) {
+        for (const kw of keywords) {
+          if (text.toLowerCase().includes(kw)) return prov;
+        }
+      }
+      return 'Sin especificar';
+    }
+
+    function extractLocality(p) {
+      const text = [p.location, p.title].filter(Boolean).join(' ');
+      const cities = [
+        'Gualeguaychú', 'Gualeguaychu', 'Zárate', 'Zarate', 'Pilar', 'Merlo', 'Villa Carlos Paz',
+        'Carlos Paz', 'José Ignacio', 'Punta Ballena', 'Neuquén', 'Neuquen', 'La Paz',
+        'Pirané', 'Pirane', 'Cruz del Yugo', 'Lavalle', 'Alto del Olvido', 'El Rancho',
+        'Mayu Sumaj', 'Córdoba', 'Cordoba', 'Camino San Carlos'
+      ];
+      for (const c of cities) {
+        if (text.toLowerCase().includes(c.toLowerCase())) return c;
+      }
+      return p.location ? p.location.split(',')[0].substring(0, 40) : 'Desconocido';
+    }
+
+    function renderLocationSummary() {
+      const grouped = {};
+      for (const p of allProps) {
+        const prov = extractProvince(p);
+        const loc = extractLocality(p);
+        const key = `${prov}|${loc}`;
+        if (!grouped[key]) grouped[key] = { province: prov, locality: loc, zonaprop: 0, argenprop: 0, total: 0 };
+        grouped[key][p.source]++;
+        grouped[key].total++;
+      }
+
+      const rows = Object.values(grouped).sort((a, b) => b.total - a.total);
+      const body = document.getElementById('locationBody');
+      if (!body) return;
+
+      body.innerHTML = rows.map(r => `
+        <tr class="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+          <td class="py-2.5 px-3 text-white/70 font-medium">${r.province}</td>
+          <td class="py-2.5 px-3 text-white/50">${r.locality}</td>
+          <td class="py-2.5 px-3 text-center">${r.zonaprop ? `<span class="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-orange-400/10 text-orange-400 font-semibold">${r.zonaprop}</span>` : '<span class="text-white/15">-</span>'}</td>
+          <td class="py-2.5 px-3 text-center">${r.argenprop ? `<span class="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-blue-400/10 text-blue-400 font-semibold">${r.argenprop}</span>` : '<span class="text-white/15">-</span>'}</td>
+          <td class="py-2.5 px-3 text-center"><span class="font-semibold text-white/80">${r.total}</span></td>
+        </tr>
+      `).join('');
+
+      // Stats summary above table
+      const provinces = [...new Set(rows.map(r => r.province))];
+      const summary = document.getElementById('locationSummary');
+      summary.innerHTML = `
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
+          <div class="bg-white/[0.02] rounded-xl p-3 text-center">
+            <p class="text-2xl font-bold gradient-text">${provinces.length}</p>
+            <p class="text-[10px] text-white/30 uppercase tracking-wider mt-0.5">Provincias</p>
+          </div>
+          <div class="bg-white/[0.02] rounded-xl p-3 text-center">
+            <p class="text-2xl font-bold text-white/80">${rows.length}</p>
+            <p class="text-[10px] text-white/30 uppercase tracking-wider mt-0.5">Localidades</p>
+          </div>
+          <div class="bg-white/[0.02] rounded-xl p-3 text-center">
+            <p class="text-2xl font-bold text-white/80">${allProps.length}</p>
+            <p class="text-[10px] text-white/30 uppercase tracking-wider mt-0.5">Propiedades</p>
+          </div>
+          <div class="bg-white/[0.02] rounded-xl p-3 text-center">
+            <p class="text-2xl font-bold text-white/80">2</p>
+            <p class="text-[10px] text-white/30 uppercase tracking-wider mt-0.5">Portales</p>
+          </div>
+        </div>`;
+    }
+
+    function toggleLocationTable() {
+      const table = document.getElementById('locationTable');
+      const btn = document.getElementById('locToggle');
+      const isHidden = table.classList.contains('hidden');
+      table.classList.toggle('hidden');
+      document.getElementById('locationSummary').classList.toggle('hidden');
+      btn.textContent = isHidden ? 'Ocultar tabla' : 'Mostrar tabla';
+    }
+
+    function openModal(p) {
+      const modal = document.getElementById('modal');
+      document.getElementById('modalTitle').textContent = p.title || 'Propiedad';
+      const ha = getSizeHa(p.superficieM2);
+      const sizeLabel = ha >= 1 ? ha.toLocaleString('es-AR') + ' hectáreas' : formatM2(p.superficieM2);
+
+      document.getElementById('modalContent').innerHTML = `
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div>
+            <img src="${p.image || getPlaceholderImg()}" alt="" class="w-full h-64 lg:h-80 object-cover rounded-2xl mb-4" onerror="this.src='${getPlaceholderImg()}'">
+            <a href="${p.url}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-accent to-accent-light text-white text-sm font-semibold hover:opacity-90 transition-opacity">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+              Ver en ${p.source === 'zonaprop' ? 'ZonaProp' : 'ArgenProp'}
+            </a>
+          </div>
+          <div class="space-y-5">
+            <div>
+              <p class="text-3xl font-bold gradient-text mb-1">${formatPrice(p.price)}</p>
+              <div class="flex gap-2 mt-2">
+                <span class="px-2.5 py-1 rounded-lg ${p.source === 'zonaprop' ? 'source-badge-zp' : 'source-badge-ap'} text-xs font-bold text-white">${p.source === 'zonaprop' ? 'ZonaProp' : 'ArgenProp'}</span>
+                ${p.type ? `<span class="px-2.5 py-1 rounded-lg bg-white/5 text-xs text-white/60 border border-white/10">${p.type}</span>` : ''}
+              </div>
+            </div>
+            <div class="glass rounded-xl p-4 space-y-3">
+              <div class="flex items-center gap-3 text-sm">
+                <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+                <span class="text-white/60">${p.location || 'Sin ubicación'}</span>
+              </div>
+              <div class="flex items-center gap-3 text-sm">
+                <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+                <span class="text-white/60">${sizeLabel}</span>
+              </div>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold text-white/70 mb-2">Descripción</h3>
+              <p class="text-sm text-white/50 leading-relaxed">${p.description || p.features || 'Sin descripción disponible.'}</p>
+            </div>
+          </div>
+        </div>`;
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+    // --- MAP ---
+    function toggleMap() {
+      const container = document.getElementById('mapContainer');
+      const btn = document.getElementById('mapToggle');
+      const isOpen = !container.classList.contains('hidden');
+      if (isOpen) {
+        container.classList.add('hidden');
+        btn.classList.remove('active');
+        btn.innerHTML = '<svg class="w-4 h-4 inline mr-1.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg> Mostrar Mapa';
+      } else {
+        container.classList.remove('hidden');
+        btn.classList.add('active');
+        btn.innerHTML = '<svg class="w-4 h-4 inline mr-1.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg> Ocultar Mapa';
+        if (!mapInitialized) initMap();
+        setTimeout(() => map.invalidateSize(), 100);
+        updateMapMarkers();
+      }
+    }
+
+    function initMap() {
+      map = L.map('map', { zoomControl: true, attributionControl: false }).setView([-36.5, -62], 4);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19
+      }).addTo(map);
+      mapInitialized = true;
+    }
+
+    function updateMapMarkers() {
+      if (!map) return;
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+
+      const filtered = allProps.filter(p => {
+        if (!p.lat || !p.lng) return false;
+        if (activeSource !== 'all' && p.source !== activeSource) return false;
+        const ha = getSizeHa(p.superficieM2);
+        if (activeSize === 'small' && ha >= 100) return false;
+        if (activeSize === 'medium' && (ha < 100 || ha > 1000)) return false;
+        if (activeSize === 'large' && ha <= 1000) return false;
+        return true;
+      });
+
+      const bounds = [];
+      filtered.forEach(p => {
+        const isZP = p.source === 'zonaprop';
+        const color = isZP ? '#f97316' : '#3b82f6';
+        const ha = getSizeHa(p.superficieM2);
+        const sizeLabel = ha >= 1 ? ha.toLocaleString('es-AR') + ' ha' : formatM2(p.superficieM2);
+        const price = (p.price && p.price !== 'Consultar precio') ? p.price : 'Consultar';
+
+        const icon = L.divIcon({
+          className: '',
+          html: `<div style="width:14px;height:14px;background:linear-gradient(135deg,${color},${isZP ? '#fb923c' : '#60a5fa'});border:2px solid rgba(255,255,255,0.4);border-radius:50%;box-shadow:0 0 10px ${color}60;"></div>`,
+          iconSize: [14, 14],
+          iconAnchor: [7, 7],
+        });
+
+        const popup = `
+          <div style="min-width:220px;max-width:280px;padding:4px 0;">
+            <div style="display:flex;gap:6px;margin-bottom:8px;">
+              <span style="background:linear-gradient(135deg,${isZP ? '#f97316,#fb923c' : '#3b82f6,#60a5fa'});padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;color:#fff;text-transform:uppercase;">${isZP ? 'ZonaProp' : 'ArgenProp'}</span>
+              ${p.type ? `<span style="background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:6px;font-size:10px;color:rgba(255,255,255,0.5);">${p.type}</span>` : ''}
+            </div>
+            <p style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.85);margin:0 0 6px;line-height:1.3;">${(p.title || '').substring(0, 80)}</p>
+            <p style="font-size:18px;font-weight:700;background:linear-gradient(135deg,#e94560,#ff6b81);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0 0 6px;">${price}</p>
+            <p style="font-size:11px;color:rgba(255,255,255,0.4);margin:0 0 4px;">${sizeLabel}</p>
+            <p style="font-size:11px;color:rgba(255,255,255,0.35);margin:0 0 10px;">${p.location || ''}</p>
+            <div style="display:flex;gap:6px;">
+              <a href="${p.url}" target="_blank" style="flex:1;text-align:center;padding:6px 0;border-radius:8px;background:linear-gradient(135deg,#e94560,#ff6b81);color:#fff;font-size:11px;font-weight:600;text-decoration:none;">Ver publicación</a>
+              <button onclick="openModal(allProps.find(x=>x.url==='${p.url?.replace(/'/g, "\\'")}'))" style="padding:6px 12px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);font-size:11px;cursor:pointer;">Detalle</button>
+            </div>
+          </div>`;
+
+        const marker = L.marker([p.lat, p.lng], { icon }).addTo(map).bindPopup(popup);
+        markers.push(marker);
+        bounds.push([p.lat, p.lng]);
+      });
+
+      if (bounds.length > 1) map.fitBounds(bounds, { padding: [40, 40] });
+      else if (bounds.length === 1) map.setView(bounds[0], 10);
+    }
+
+    // Filter buttons
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('filter-active'));
+        btn.classList.add('filter-active');
+        activeSource = btn.dataset.filter;
+        render();
+      });
+    });
+
+    document.querySelectorAll('.size-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('filter-active'));
+        btn.classList.add('filter-active');
+        activeSize = btn.dataset.size;
+        render();
+      });
+    });
+
+    document.getElementById('sortSelect').addEventListener('change', render);
+
+    // Load data - embebido, se regenera con: node build-dashboard.js
+    
+    allProps = [
+  {
+    "source": "zonaprop",
+    "title": "180000 ha tot.",
+    "price": "USD 1.080.000",
+    "location": "Camino san Carlos km 8 8",
+    "superficieM2": 1800000000,
+    "filterLabel": "0-500 m2",
+    "description": "Venta de campo en Córdoba Capital, Camino San Carlos km 8! Esta propiedad se extiende sobre 18 hectáreas de terreno, ideal para proyectos agrícolas o desarrollo rural. Ubicado en una zona estratégica, ofrece fácil acceso a la ciudad y a las principales rutas. La amplitud del terreno permite una gran variedad de usos, desde el cultivo hasta la cría de ganado. Brinda la libertad de diseñar y desarrollar según sus necesidades. Oportunidad única para inversores o para quienes buscan un refugio en la",
+    "url": "https://www.zonaprop.com.ar/propiedades/clasificado/veclrain-venta-18-hectareas-camino-san-carlos-km8-59450354.html?n_src=Listado&n_pg=1&n_pos=1&n_search_id=a16518ee-a38f-4c9c-8be1-fe6df76c7889",
+    "image": "https://imgar.zonapropcdn.com/avisos/1/00/59/45/03/54/360x266/2061514141.jpg?isFirstImage=true",
+    "scrapedAt": "2026-07-27T04:33:36.648Z"
+  },
+  {
+    "source": "zonaprop",
+    "title": "7722 m² tot.",
+    "price": "USD 1.200.000",
+    "location": "Futa Leufu",
+    "superficieM2": 7722,
+    "filterLabel": "0-500 m2",
+    "description": "Hermosa quinta de 7. 700 m² ubicada en Neuquén, una propiedad única que combina naturaleza, amplitud y múltiples posibilidades de desarrollo. El predio cuenta con dos casas listas para habitar y cinco departamentos completamente preparados para alquiler, lo que la convierte en una excelente oportunidad tanto para vivienda como para inversión con renta inmediata. Se destaca por su arboleda añosa y variada, con una importante presencia de árboles frutales y especies ornamentales que aportan privac",
+    "url": "https://www.zonaprop.com.ar/propiedades/clasificado/veclrain-chacra-en-neuquen-59681515.html?n_src=Listado&n_pills=Pileta&n_pg=1&n_pos=2&n_search_id=a16518ee-a38f-4c9c-8be1-fe6df76c7889",
+    "image": "https://imgar.zonapropcdn.com/avisos/1/00/59/68/15/15/360x266/2067124831.jpg?isFirstImage=true",
+    "scrapedAt": "2026-07-27T04:33:36.648Z"
+  },
+  {
+    "source": "zonaprop",
+    "title": "30000 m² tot.\n8 amb.\n6 dorm.\n3 baños\n1 coch.",
+    "price": "USD 350.000",
+    "location": "El Rancho",
+    "superficieM2": 30000,
+    "filterLabel": "0-500 m2",
+    "description": "Jb srur vende propiedad de gran escala con características únicas, ideal para desarrollo turístico, ubicada en Mayu Sumaj, Valle de Punilla, Córdoba. La propiedad se encuentra en Mayu Sumaj, una de las zonas con mayor crecimiento del Valle de Punilla, reconocida por su entorno natural, bajada directa al río y atractivo turístico durante todo el año. Su ubicación permite fácil acceso desde Villa Carlos Paz y conexión con los principales corredores turísticos de la región. Características del pred",
+    "url": "https://www.zonaprop.com.ar/propiedades/clasificado/veclrain-propiedad-en-venta-en-mayu-sumaj-30.000-m-sup2--con-58064960.html?n_src=Listado&n_pills=Pileta&n_pg=1&n_pos=3&n_search_id=a16518ee-a38f-4c9c-8be1-fe6df76c7889",
+    "image": "https://imgar.zonapropcdn.com/avisos/1/00/58/06/49/60/360x266/2024521253.jpg?isFirstImage=true",
+    "scrapedAt": "2026-07-27T04:33:36.648Z"
+  },
+  {
+    "source": "zonaprop",
+    "title": "Chacra de 15 hectáreas, con costa sobre la laguna de José Ignacio, con 3 lagunitas propia. Zona Mede",
+    "price": "USD 5.400.000",
+    "location": "Chacra en venta de 15 Has. sobre Laguna José Ignacio al 100",
+    "superficieM2": 150000,
+    "filterLabel": "0-500 m2",
+    "description": "Chacra de 15 hectáreas, con costa sobre la laguna de José Ignacio, con 3 lagunitas propia. Zona Medellín Polo club. Increíbles vistas, privacidad y un entorno natural único para descansar y hacer deportes acuáticos en la laguna. Acceso por Santa Monica. A 8 minutos de José Ignacio. Posibilidad de agrandar la superficie con lotes linderos. Consultar. Perimetro aproximado: 500 mts x 300 mts. Los perímetros marcados en las fotos son solo ilustrativos.",
+    "url": "https://www.zonaprop.com.ar/propiedades/clasificado/veclrain-chacra-en-venta-de-15-ha-sobre-laguna-jose-ignacio-56772088.html?n_src=Listado&n_pills=Apto+cr%C3%A9dito&n_pg=1&n_pos=5&n_search_id=a16518ee-a38f-4c9c-8be1-fe6df76c7889",
+    "image": "https://imgar.zonapropcdn.com/avisos/1/00/56/77/20/88/360x266/2011579969.jpg?isFirstImage=true",
+    "scrapedAt": "2026-07-27T04:33:36.648Z"
+  },
+  {
+    "source": "zonaprop",
+    "title": "90000 ha tot.",
+    "price": "USD 495.000",
+    "location": "Camino Costa Brava Cuartel III - Zarate",
+    "superficieM2": 900000000,
+    "filterLabel": "0-500 m2",
+    "description": "Descubra una excepcional propiedad rural en el corazón de Zárate, una oportunidad única para quienes buscan un campo con potencial agrícola y una ubicación estratégica. Este campo de 9 hectáreas, anteriormente dedicado al cultivo de arándanos, ha estado en reposo durante 10 años, lo que ha permitido que la tierra se mantenga en óptimas condiciones, lista para nuevas plantaciones de frutales o cualquier otro proyecto agrícola. El entorno es simplemente encantador, rodeado de majestuosas araucaria",
+    "url": "https://www.zonaprop.com.ar/propiedades/clasificado/veclrain-venta-de-campo-de-9has-ideal-inversion-en-zarate-56913180.html?n_src=Listado&n_pills=Apto+cr%C3%A9dito&n_pg=1&n_pos=6&n_search_id=a16518ee-a38f-4c9c-8be1-fe6df76c7889",
+    "image": "https://imgar.zonapropcdn.com/avisos/1/00/56/91/31/80/360x266/2051045321.jpg?isFirstImage=true",
+    "scrapedAt": "2026-07-27T04:33:36.648Z"
+  },
+  {
+    "source": "argenprop",
+    "title": "Campo en Venta en Cruz del Yugo, La Paz",
+    "price": "Consultar precio",
+    "location": "Carril de los Baldes s/n",
+    "superficieM2": 45000000,
+    "filterLabel": "0-500 m2",
+    "type": "Ganadero",
+    "features": "4.500 ha Ganadero Excelente",
+    "url": "https://www.argenprop.com/campo-en-venta-en-cruz-del-yugo--17556975",
+    "image": "https://www.argenprop.com/static-content/57965571/c8fbff10-4f59-4001-841c-7ace773798bb_u_small.jpg",
+    "scrapedAt": "2026-07-27T04:34:36.064Z"
+  },
+  {
+    "source": "argenprop",
+    "title": "Campo en Venta en Pirane, Pirané",
+    "price": "USD 6.999.999",
+    "location": "PIRANE 100",
+    "superficieM2": 75000000,
+    "filterLabel": "0-500 m2",
+    "type": "Ganadero",
+    "features": "7.500 ha Ganadero Excelente",
+    "url": "https://www.argenprop.com/campo-en-venta-en-pirane--16939639",
+    "image": "https://www.argenprop.com/static-content/93693961/91999247-79c7-4cff-96b3-8a4cb9654fdc_u_small.jpg",
+    "scrapedAt": "2026-07-27T04:34:36.065Z"
+  },
+  {
+    "source": "argenprop",
+    "title": "Campo en Venta en Alto del Olvido, Lavalle",
+    "price": "USD 85.000",
+    "location": "Av San Martin 7000",
+    "superficieM2": 200000,
+    "filterLabel": "0-500 m2",
+    "type": "Agrícola",
+    "features": "20 ha Agrícola Excelente",
+    "url": "https://www.argenprop.com/campo-en-venta-en-alto-del-olvido--20066327",
+    "image": "",
+    "scrapedAt": "2026-07-27T04:34:36.065Z"
+  },
+  {
+    "source": "argenprop",
+    "title": "Campo en Venta en Gualeguaychu, Gualeguaychú",
+    "price": "USD 6.000",
+    "location": "El Potrero 42 ha s/ripio RETASADO!!!",
+    "superficieM2": 420000,
+    "filterLabel": "0-500 m2",
+    "type": "agrícola",
+    "features": "42 ha Agrícola Muy Bueno",
+    "url": "https://www.argenprop.com/campo-en-venta-en-gualeguaychu--17499271",
+    "image": "",
+    "scrapedAt": "2026-07-27T04:34:36.065Z"
+  },
+  {
+    "source": "argenprop",
+    "title": "Campo en Venta en Gualeguaychu, Gualeguaychú",
+    "price": "USD 5.500",
+    "location": "Gualeguaychu,Entre Ríos a 240 km CABA",
+    "superficieM2": 1000000,
+    "filterLabel": "0-500 m2",
+    "type": "agrícola",
+    "features": "100 ha Agrícola Bueno",
+    "url": "https://www.argenprop.com/campo-en-venta-en-gualeguaychu--16778306",
+    "image": "",
+    "scrapedAt": "2026-07-27T04:34:36.065Z"
+  }
+];
+    document.getElementById('lastUpdate').textContent = 'Actualizado: ' + '27/7/2026, 01:34:36';
+    render();
+  
+  </script>
+
+</body>
+</html>
