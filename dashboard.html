@@ -130,6 +130,14 @@
       <button data-size="medium" class="size-btn px-4 py-1.5 rounded-full text-xs font-medium border border-white/10 hover:border-white/30 transition-all">100 - 1.000 ha</button>
       <button data-size="large" class="size-btn px-4 py-1.5 rounded-full text-xs font-medium border border-white/10 hover:border-white/30 transition-all">&gt; 1.000 ha</button>
       <div class="w-px h-5 bg-white/10 mx-1"></div>
+      <select id="provinciaSelect" class="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/70 outline-none focus:border-accent/50">
+        <option value="">Todas las provincias</option>
+      </select>
+      <select id="ciudadSelect" class="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/70 outline-none focus:border-accent/50">
+        <option value="">Todas las ciudades</option>
+      </select>
+      <input id="searchInput" type="text" placeholder="Buscar..." class="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/70 outline-none focus:border-accent/50 w-32 placeholder:text-white/20">
+      <div class="w-px h-5 bg-white/10 mx-1"></div>
       <select id="sortSelect" class="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/70 outline-none focus:border-accent/50">
         <option value="price-asc">Precio: menor a mayor</option>
         <option value="price-desc">Precio: mayor a menor</option>
@@ -155,6 +163,13 @@
     <!-- Empty state -->
     <div id="emptyState" class="hidden text-center py-20">
       <p class="text-white/30 text-lg">No se encontraron propiedades</p>
+    </div>
+
+    <!-- Pagination -->
+    <div id="pagination" class="flex items-center justify-center gap-4 mt-8 mb-4 hidden">
+      <button onclick="goToPage(currentPage - 1)" id="prevBtn" class="px-4 py-2 rounded-xl glass text-xs font-medium border border-white/10 text-white/60 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed">Anterior</button>
+      <span id="pageInfo" class="text-xs text-white/40">Página 1 de 1</span>
+      <button onclick="goToPage(currentPage + 1)" id="nextBtn" class="px-4 py-2 rounded-xl glass text-xs font-medium border border-white/10 text-white/60 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed">Siguiente</button>
     </div>
   </main>
 
@@ -273,11 +288,10 @@
       grid.innerHTML = filtered.map((p, i) => renderCard(p, i)).join('');
 
       // Stats
-      document.getElementById('statTotal').textContent = filtered.length;
-      document.getElementById('statZP').textContent = filtered.filter(p => p.source === 'zonaprop').length;
-      document.getElementById('statAP').textContent = filtered.filter(p => p.source === 'argenprop').length;
-      const prices = filtered.map(p => parsePriceUSD(p.price)).filter(Boolean);
-      document.getElementById('statMinPrice').textContent = prices.length ? 'USD ' + Math.min(...prices).toLocaleString('es-AR') : '-';
+      document.getElementById('statTotal').textContent = globalStats.total || 0;
+      document.getElementById('statZP').textContent = globalStats.zonaprop || 0;
+      document.getElementById('statAP').textContent = globalStats.argenprop || 0;
+      document.getElementById('statMinPrice').textContent = globalStats.minPrice ? 'USD ' + globalStats.minPrice.toLocaleString('es-AR') : '-';
 
       if (mapInitialized) updateMapMarkers();
       renderLocationSummary();
@@ -320,7 +334,7 @@
     function renderLocationSummary() {
       const grouped = {};
       for (const p of allProps) {
-        const prov = extractProvince(p);
+        const prov = p.province || extractProvince(p);
         const loc = extractLocality(p);
         const key = `${prov}|${loc}`;
         if (!grouped[key]) grouped[key] = { province: prov, locality: loc, zonaprop: 0, argenprop: 0, total: 0 };
@@ -513,7 +527,8 @@
         document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('filter-active'));
         btn.classList.add('filter-active');
         activeSource = btn.dataset.filter;
-        render();
+        currentPage = 1;
+        loadData();
       });
     });
 
@@ -522,144 +537,95 @@
         document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('filter-active'));
         btn.classList.add('filter-active');
         activeSize = btn.dataset.size;
-        render();
+        currentPage = 1;
+        loadData();
       });
     });
 
-    document.getElementById('sortSelect').addEventListener('change', render);
+    // Location filters
+    const provinciaSel = document.getElementById('provinciaSelect');
+    const ciudadSel = document.getElementById('ciudadSelect');
+    const searchInput = document.getElementById('searchInput');
 
-    // Load data - embebido, se regenera con: node build-dashboard.js
-    
-    allProps = [
-  {
-    "source": "zonaprop",
-    "title": "180000 ha tot.",
-    "price": "USD 1.080.000",
-    "location": "Camino san Carlos km 8 8",
-    "superficieM2": 1800000000,
-    "filterLabel": "0-500 m2",
-    "description": "Venta de campo en Córdoba Capital, Camino San Carlos km 8! Esta propiedad se extiende sobre 18 hectáreas de terreno, ideal para proyectos agrícolas o desarrollo rural. Ubicado en una zona estratégica, ofrece fácil acceso a la ciudad y a las principales rutas. La amplitud del terreno permite una gran variedad de usos, desde el cultivo hasta la cría de ganado. Brinda la libertad de diseñar y desarrollar según sus necesidades. Oportunidad única para inversores o para quienes buscan un refugio en la",
-    "url": "https://www.zonaprop.com.ar/propiedades/clasificado/veclrain-venta-18-hectareas-camino-san-carlos-km8-59450354.html?n_src=Listado&n_pg=1&n_pos=1&n_search_id=a16518ee-a38f-4c9c-8be1-fe6df76c7889",
-    "image": "https://imgar.zonapropcdn.com/avisos/1/00/59/45/03/54/360x266/2061514141.jpg?isFirstImage=true",
-    "scrapedAt": "2026-07-27T04:33:36.648Z"
-  },
-  {
-    "source": "zonaprop",
-    "title": "7722 m² tot.",
-    "price": "USD 1.200.000",
-    "location": "Futa Leufu",
-    "superficieM2": 7722,
-    "filterLabel": "0-500 m2",
-    "description": "Hermosa quinta de 7. 700 m² ubicada en Neuquén, una propiedad única que combina naturaleza, amplitud y múltiples posibilidades de desarrollo. El predio cuenta con dos casas listas para habitar y cinco departamentos completamente preparados para alquiler, lo que la convierte en una excelente oportunidad tanto para vivienda como para inversión con renta inmediata. Se destaca por su arboleda añosa y variada, con una importante presencia de árboles frutales y especies ornamentales que aportan privac",
-    "url": "https://www.zonaprop.com.ar/propiedades/clasificado/veclrain-chacra-en-neuquen-59681515.html?n_src=Listado&n_pills=Pileta&n_pg=1&n_pos=2&n_search_id=a16518ee-a38f-4c9c-8be1-fe6df76c7889",
-    "image": "https://imgar.zonapropcdn.com/avisos/1/00/59/68/15/15/360x266/2067124831.jpg?isFirstImage=true",
-    "scrapedAt": "2026-07-27T04:33:36.648Z"
-  },
-  {
-    "source": "zonaprop",
-    "title": "30000 m² tot.\n8 amb.\n6 dorm.\n3 baños\n1 coch.",
-    "price": "USD 350.000",
-    "location": "El Rancho",
-    "superficieM2": 30000,
-    "filterLabel": "0-500 m2",
-    "description": "Jb srur vende propiedad de gran escala con características únicas, ideal para desarrollo turístico, ubicada en Mayu Sumaj, Valle de Punilla, Córdoba. La propiedad se encuentra en Mayu Sumaj, una de las zonas con mayor crecimiento del Valle de Punilla, reconocida por su entorno natural, bajada directa al río y atractivo turístico durante todo el año. Su ubicación permite fácil acceso desde Villa Carlos Paz y conexión con los principales corredores turísticos de la región. Características del pred",
-    "url": "https://www.zonaprop.com.ar/propiedades/clasificado/veclrain-propiedad-en-venta-en-mayu-sumaj-30.000-m-sup2--con-58064960.html?n_src=Listado&n_pills=Pileta&n_pg=1&n_pos=3&n_search_id=a16518ee-a38f-4c9c-8be1-fe6df76c7889",
-    "image": "https://imgar.zonapropcdn.com/avisos/1/00/58/06/49/60/360x266/2024521253.jpg?isFirstImage=true",
-    "scrapedAt": "2026-07-27T04:33:36.648Z"
-  },
-  {
-    "source": "zonaprop",
-    "title": "Chacra de 15 hectáreas, con costa sobre la laguna de José Ignacio, con 3 lagunitas propia. Zona Mede",
-    "price": "USD 5.400.000",
-    "location": "Chacra en venta de 15 Has. sobre Laguna José Ignacio al 100",
-    "superficieM2": 150000,
-    "filterLabel": "0-500 m2",
-    "description": "Chacra de 15 hectáreas, con costa sobre la laguna de José Ignacio, con 3 lagunitas propia. Zona Medellín Polo club. Increíbles vistas, privacidad y un entorno natural único para descansar y hacer deportes acuáticos en la laguna. Acceso por Santa Monica. A 8 minutos de José Ignacio. Posibilidad de agrandar la superficie con lotes linderos. Consultar. Perimetro aproximado: 500 mts x 300 mts. Los perímetros marcados en las fotos son solo ilustrativos.",
-    "url": "https://www.zonaprop.com.ar/propiedades/clasificado/veclrain-chacra-en-venta-de-15-ha-sobre-laguna-jose-ignacio-56772088.html?n_src=Listado&n_pills=Apto+cr%C3%A9dito&n_pg=1&n_pos=5&n_search_id=a16518ee-a38f-4c9c-8be1-fe6df76c7889",
-    "image": "https://imgar.zonapropcdn.com/avisos/1/00/56/77/20/88/360x266/2011579969.jpg?isFirstImage=true",
-    "scrapedAt": "2026-07-27T04:33:36.648Z"
-  },
-  {
-    "source": "zonaprop",
-    "title": "90000 ha tot.",
-    "price": "USD 495.000",
-    "location": "Camino Costa Brava Cuartel III - Zarate",
-    "superficieM2": 900000000,
-    "filterLabel": "0-500 m2",
-    "description": "Descubra una excepcional propiedad rural en el corazón de Zárate, una oportunidad única para quienes buscan un campo con potencial agrícola y una ubicación estratégica. Este campo de 9 hectáreas, anteriormente dedicado al cultivo de arándanos, ha estado en reposo durante 10 años, lo que ha permitido que la tierra se mantenga en óptimas condiciones, lista para nuevas plantaciones de frutales o cualquier otro proyecto agrícola. El entorno es simplemente encantador, rodeado de majestuosas araucaria",
-    "url": "https://www.zonaprop.com.ar/propiedades/clasificado/veclrain-venta-de-campo-de-9has-ideal-inversion-en-zarate-56913180.html?n_src=Listado&n_pills=Apto+cr%C3%A9dito&n_pg=1&n_pos=6&n_search_id=a16518ee-a38f-4c9c-8be1-fe6df76c7889",
-    "image": "https://imgar.zonapropcdn.com/avisos/1/00/56/91/31/80/360x266/2051045321.jpg?isFirstImage=true",
-    "scrapedAt": "2026-07-27T04:33:36.648Z"
-  },
-  {
-    "source": "argenprop",
-    "title": "Campo en Venta en Cruz del Yugo, La Paz",
-    "price": "Consultar precio",
-    "location": "Carril de los Baldes s/n",
-    "superficieM2": 45000000,
-    "filterLabel": "0-500 m2",
-    "type": "Ganadero",
-    "features": "4.500 ha Ganadero Excelente",
-    "url": "https://www.argenprop.com/campo-en-venta-en-cruz-del-yugo--17556975",
-    "image": "https://www.argenprop.com/static-content/57965571/c8fbff10-4f59-4001-841c-7ace773798bb_u_small.jpg",
-    "scrapedAt": "2026-07-27T04:34:36.064Z"
-  },
-  {
-    "source": "argenprop",
-    "title": "Campo en Venta en Pirane, Pirané",
-    "price": "USD 6.999.999",
-    "location": "PIRANE 100",
-    "superficieM2": 75000000,
-    "filterLabel": "0-500 m2",
-    "type": "Ganadero",
-    "features": "7.500 ha Ganadero Excelente",
-    "url": "https://www.argenprop.com/campo-en-venta-en-pirane--16939639",
-    "image": "https://www.argenprop.com/static-content/93693961/91999247-79c7-4cff-96b3-8a4cb9654fdc_u_small.jpg",
-    "scrapedAt": "2026-07-27T04:34:36.065Z"
-  },
-  {
-    "source": "argenprop",
-    "title": "Campo en Venta en Alto del Olvido, Lavalle",
-    "price": "USD 85.000",
-    "location": "Av San Martin 7000",
-    "superficieM2": 200000,
-    "filterLabel": "0-500 m2",
-    "type": "Agrícola",
-    "features": "20 ha Agrícola Excelente",
-    "url": "https://www.argenprop.com/campo-en-venta-en-alto-del-olvido--20066327",
-    "image": "",
-    "scrapedAt": "2026-07-27T04:34:36.065Z"
-  },
-  {
-    "source": "argenprop",
-    "title": "Campo en Venta en Gualeguaychu, Gualeguaychú",
-    "price": "USD 6.000",
-    "location": "El Potrero 42 ha s/ripio RETASADO!!!",
-    "superficieM2": 420000,
-    "filterLabel": "0-500 m2",
-    "type": "agrícola",
-    "features": "42 ha Agrícola Muy Bueno",
-    "url": "https://www.argenprop.com/campo-en-venta-en-gualeguaychu--17499271",
-    "image": "",
-    "scrapedAt": "2026-07-27T04:34:36.065Z"
-  },
-  {
-    "source": "argenprop",
-    "title": "Campo en Venta en Gualeguaychu, Gualeguaychú",
-    "price": "USD 5.500",
-    "location": "Gualeguaychu,Entre Ríos a 240 km CABA",
-    "superficieM2": 1000000,
-    "filterLabel": "0-500 m2",
-    "type": "agrícola",
-    "features": "100 ha Agrícola Bueno",
-    "url": "https://www.argenprop.com/campo-en-venta-en-gualeguaychu--16778306",
-    "image": "",
-    "scrapedAt": "2026-07-27T04:34:36.065Z"
-  }
-];
-    document.getElementById('lastUpdate').textContent = 'Actualizado: ' + '27/7/2026, 01:34:36';
-    render();
-  
+    provinciaSel.addEventListener('change', () => {
+      currentPage = 1;
+      ciudadSel.innerHTML = '<option value="">Todas las ciudades</option>';
+      ciudadSel.disabled = true;
+      const prov = provinciaSel.value;
+      if (prov && ciudadesPorProv && ciudadesPorProv[prov]) {
+        ciudadesPorProv[prov].forEach(c => {
+          ciudadSel.innerHTML += `<option value="${c}">${c}</option>`;
+        });
+        ciudadSel.disabled = false;
+      }
+      loadData();
+    });
+    ciudadSel.addEventListener('change', () => { currentPage = 1; loadData(); });
+
+    let searchTimer;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => { currentPage = 1; loadData(); }, 400);
+    });
+
+    document.getElementById('sortSelect').addEventListener('change', () => { currentPage = 1; loadData(); });
+
+    // Load data - via API con paginacion
+    let currentPage = 1;
+    let totalPages = 1;
+    let globalStats = {};
+    let ciudadesPorProv = {};
+    const PAGE_LIMIT = 50;
+
+    async function loadData() {
+      const params = new URLSearchParams({
+        page: currentPage,
+        limit: PAGE_LIMIT,
+        source: activeSource,
+        size: activeSize,
+        sort: document.getElementById('sortSelect').value,
+      });
+      const prov = provinciaSel.value;
+      if (prov) params.set('province', prov);
+      const city = ciudadSel.value;
+      if (city) params.set('city', city);
+      const q = searchInput.value.trim();
+      if (q) params.set('q', q);
+
+      const res = await fetch(`/api/propiedades?${params}`);
+      const json = await res.json();
+      allProps = json.data;
+      totalPages = json.pagination.totalPages;
+      globalStats = json.stats;
+
+      const pag = document.getElementById('pagination');
+      if (totalPages > 1) {
+        pag.classList.remove('hidden');
+        document.getElementById('pageInfo').textContent = `P\u00e1gina ${currentPage} de ${totalPages}`;
+        document.getElementById('prevBtn').disabled = currentPage <= 1;
+        document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+      } else {
+        pag.classList.add('hidden');
+      }
+
+      document.getElementById('lastUpdate').textContent = globalStats.latestDate ? 'Actualizado: ' + new Date(globalStats.latestDate).toLocaleString('es-AR') : '';
+      render();
+    }
+
+    function goToPage(page) {
+      if (page < 1 || page > totalPages) return;
+      currentPage = page;
+      loadData();
+    }
+
+    // Load filter options
+    fetch('/api/filters').then(r => r.json()).then(f => {
+      ciudadesPorProv = f.ciudades || {};
+      f.provincias.forEach(p => {
+        provinciaSel.innerHTML += `<option value="${p}">${p}</option>`;
+      });
+    });
+    loadData();
   </script>
 
 </body>

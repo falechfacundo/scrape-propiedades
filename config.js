@@ -1,7 +1,6 @@
-export const MONGO_URI = 'mongodb://localhost:27017';
-export const MONGO_DB = 'propiedades';
+export const MONGO_URI = 'mongodb://localhost:27017/propiedades';
 
-export const MAX_RESULTS_PER_LOCATION = 500;
+export const MAX_RESULTS_PER_LOCATION = 100;
 export const DELAY_BETWEEN_PAGES_MS = 4000;
 export const DELAY_BETWEEN_LOCATIONS_MS = 5000;
 
@@ -101,5 +100,15 @@ export const PROVINCIAS = {
   'Jujuy': {
     zonaprop: [{ label: 'Jujuy', slug: 'campos-venta-jujuy' }],
     argenprop: [{ label: 'Jujuy', path: 'campos/venta/jujuy' }],
+  },
+  'CABA': {
+    zonaprop: [
+      { label: 'Palermo', slug: 'departamentos-venta-palermo-1-ambiente' },
+      { label: 'Recoleta', slug: 'departamentos-venta-recoleta-1-ambiente' },
+    ],
+    argenprop: [
+      { label: 'Palermo', path: 'departamentos/venta/palermo-1-ambiente' },
+      { label: 'Recoleta', path: 'departamentos/venta/recoleta-1-ambiente' },
+    ],
   },
 };

@@ -51,7 +51,7 @@ export async function scrapeArgenProp(page, locations) {
         await sleep(1000);
 
         const propiedades = await page.evaluate(() => {
-          const cards = document.querySelectorAll('a.card[href*="campo"]');
+          const cards = document.querySelectorAll('a.card');
           return Array.from(cards).map((card) => {
             const titleEl = card.querySelector('h2.card__title');
             const priceEl = card.querySelector('.card__price');

@@ -7,10 +7,12 @@
   "scripts": {
     "scrape": "node index.js",
     "scrape:zonaprop": "node index.js --zonaprop",
-    "scrape:argenprop": "node index.js --argenprop"
+    "scrape:argenprop": "node index.js --argenprop",
+    "start": "node server.js"
   },
   "dependencies": {
-    "playwright": "^1.48.0",
-    "mongodb": "^6.12.0"
+    "express": "^5.2.1",
+    "mongodb": "^6.12.0",
+    "playwright": "^1.48.0"
   }
 }
